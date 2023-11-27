@@ -1,109 +1,75 @@
-import sys
-from PyQt5.QtWidgets import QMainWindow, QApplication, QTableWidgetItem
-import io
-from PyQt5 import uic
+from PyQt5.QtWidgets import QApplication, QMainWindow, QHeaderView, QTableWidgetItem
+from PyQt5 import uic as QInterface
+
 import sqlite3
-
-template = """<?xml version="1.0" encoding="UTF-8"?>
-<ui version="4.0">
- <class>MainWindow</class>
- <widget class="QMainWindow" name="MainWindow">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>981</width>
-    <height>600</height>
-   </rect>
-  </property>
-  <property name="windowTitle">
-   <string>MainWindow</string>
-  </property>
-  <widget class="QWidget" name="centralwidget">
-   <widget class="QTableWidget" name="tableWidget">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>1</y>
-      <width>981</width>
-      <height>541</height>
-     </rect>
-    </property>
-    <column>
-     <property name="text">
-      <string>ID</string>
-     </property>
-    </column>
-    <column>
-     <property name="text">
-      <string>Сорт</string>
-     </property>
-    </column>
-    <column>
-     <property name="text">
-      <string>Обжарка</string>
-     </property>
-    </column>
-    <column>
-     <property name="text">
-      <string>Молотый/в зернах</string>
-     </property>
-    </column>
-    <column>
-     <property name="text">
-      <string>Описание вкуса</string>
-     </property>
-    </column>
-    <column>
-     <property name="text">
-      <string>Цена</string>
-     </property>
-    </column>
-    <column>
-     <property name="text">
-      <string>Объем</string>
-     </property>
-    </column>
-   </widget>
-  </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>981</width>
-     <height>26</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QStatusBar" name="statusbar"/>
- </widget>
- <resources/>
- <connections/>
-</ui>
-"""
+import sys
 
 
-class Coffee(QMainWindow):
+class AddCoffee(QMainWindow):
     def __init__(self):
-        super(Coffee, self).__init__()
-        self.f = io.StringIO(template)
-        uic.loadUi(self.f, self)
-        self.open_table()
+        super(AddCoffee, self).__init__()
+        QInterface('add_coffee_form.ui', self)
 
-    def open_table(self):
-        con = sqlite3.connect("coffee.sqlite")
-        cur = con.cursor()
-        data = cur.execute("SELECT * FROM coffe_info").fetchall()
-        self.tableWidget.setRowCount(len(data))
-        for i, row in enumerate(data):
-            for j, elem in enumerate(row):
-                self.tableWidget.setItem(
-                    i, j, QTableWidgetItem(str(elem)))
+        self.bindUi()
+
+    def bindUi(self):
+        self.addButton.clicked.connect(self.addCoffee)
+
+    def addCoffee(self):
+        sort = self.sort.text()
+        roasting = self.roasting.text()
+        coffee = self.coffee.text()
+        taste = self.taste.text()
+        price = self.price.text()
+        capacity = self.capacity.text()
+
+        if not all([req for req in [sort, roasting, coffee, taste, price, capacity]]):
+            self.statusBar().showMessage('Не удалось добавить новое кофе.')
+            return
+
+        if not roasting.isdigit():
+            self.statusBar().showMessage('Не удалось добавить новое кофе.')
+            return
+
+        if not price.isdigit():
+            self.statusBar().showMessage('Не удалось добавить новое кофе.')
+            return
+
+        if not capacity.isdigit():
+            self.statusBar().showMessage('Не удалось добавить новое кофе.')
+            return
+
+        database = sqlite3.connect('coffee.sqlite')
+        cursor = database.cursor()
+
+        cursor.execute(
+            f"""INSERT INTO coffees(sort, roasting, coffee, taste, price, capacity)
+      VALUES('{sort}', {roasting}, '{coffee}', '{taste}', {price}, {capacity})"""
+        )
+
+        database.commit()
 
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    ex = Coffee()
-    ex.show()
-    sys.exit(app.exec())
+class CoffeeViewer(QMainWindow):
+    def __init__(self):
+        super(CoffeeViewer, self).__init__()
+        QInterface.loadUi('main.ui', self)
+
+        self.loadCoffeeData(self.tableWidget)
+
+    def loadCoffeeData(self, parent):
+        parent.setRowCount(0)
+        headers = ['ID', 'Сорт', 'Обжарка', 'Кофе', 'Вкус', 'Цена кофе', 'Объем кофе']
+        parent.setColumnCount(len(headers))
+        parent.setHorizontalHeaderLabels(headers)
+        parent.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+
+        database = sqlite3.connect('coffee.sqlite')
+        cursor = database.cursor()
+
+        coffee_data = cursor.execute('SELECT * FROM coffees').fetchall()
+        for y, coffee in enumerate(coffee_data):
+            parent.setRowCount(parent.rowCount() + 1)
+            for x, description in enumerate(coffee):
+                parent.setItem(y, x, QTableWidgetItem(str(description)))
+
